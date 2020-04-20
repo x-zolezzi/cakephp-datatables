@@ -71,11 +71,26 @@ class DataTablesHelper extends Helper
             'id' => $id,
             'class' => 'dataTable ' . ($htmlOptions['class'] ?? ''),
         ]);
-        $table = $this->Html->tag('table', '', $htmlOptions);
+        $html = $this->Html->tag('table', '', $htmlOptions);
 
+        $css = $this->Html->css(['DataTables.datatable/datatables.min.css'], ['block' => true]);
+        $js = $this->Html->script(['DataTables.datatable/datatables.min.js'], ['block' => true]);
+        $have_date_render = false;
+        foreach ($dtOptions['columns'] as $column) {
+            if(isset($column['render']) && strpos($column['render'], '$.fn.dataTable.render.moment(') !== false) {
+                $have_date_render = true;
+                break;
+            }
+        }
+        if($have_date_render) {
+            $js .= $this->Html->script(['DataTables.momentjs/moment.min.js', 'DataTables.datatable/datetime.js'], ['block' => true]);
+            $js .= $this->Html->script(['DataTables.cakephp.dataTables.js'], ['block' => true]);
+        }
+        
         $code = $this->draw("#{$id}", $dtOptions);
+        $js .= $this->Html->scriptBlock($code, ['block' => true]);
 
-        return $table.$this->Html->scriptBlock($code, ['block' => true]);
+        return $html.$css.$js;
     }
 
     /**
