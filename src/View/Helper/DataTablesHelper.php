@@ -84,8 +84,8 @@ class DataTablesHelper extends Helper
         }
         if($have_date_render) {
             $js .= $this->Html->script(['DataTables.momentjs/moment.min.js', 'DataTables.datatable/datetime.js'], ['block' => true]);
-            $js .= $this->Html->script(['DataTables.cakephp.dataTables.js'], ['block' => true]);
         }
+        $js .= $this->Html->script(['DataTables.cakephp.dataTables.js'], ['block' => true]);
         
         $code = $this->draw("#{$id}", $dtOptions);
         $js .= $this->Html->scriptBlock($code, ['block' => true]);
