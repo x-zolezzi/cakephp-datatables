@@ -24,6 +24,11 @@ dt.initDataTables = function (id, options) {
             }
         });
     }
+    options.fnDrawCallback = function (setting) {
+        if (setting._iDisplayLength <= 0) {
+            $(setting.nTableWrapper).find('.dataTables_paginate, .dataTables_info').hide();
+        }
+    }
 
     /* create new instance */
     $(id).dataTable(options);
