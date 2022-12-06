@@ -1,130 +1,106 @@
 <?php
+/**
+ * A convenience method to set up a column definitions array
+ */
 
 namespace DataTables\Lib;
 
-/**
- * A convenience array wrapper that holds a single column definition
- * @method ColumnDefintion visible()
- * @method ColumnDefintion notVisible()
- * @method ColumnDefintion orderable()
- * @method ColumnDefintion notOrderable()
- * @method ColumnDefintion searchable()
- * @method ColumnDefintion notSearchable()
- */
-class ColumnDefinition implements \JsonSerializable, \ArrayAccess
+use Traversable;
+
+class ColumnDefinitions implements \JsonSerializable, \ArrayAccess, \IteratorAggregate, \Countable
 {
-    /** @var array holding all column properties */
-    public $content = [];
-
-    /** @var ColumnDefinitions */
-    protected $owner = null;
-
-    protected $switchesPositive = ['visible', 'orderable', 'searchable'];
-    // will be filled in constructor
-    protected $switchesNegative = [];
-
-    public function __construct(array $template, ColumnDefinitions $owner)
-    {
-        $this->content = $template;
-        $this->owner = $owner;
-
-        $this->switchesNegative = array_map(function ($e) {
-            return 'not'.ucfirst($e);
-        }, $this->switchesPositive);
-    }
+    protected $columns = [];
+    protected $index = [];
 
     /**
-     * Refer back to owner's add()
-     * A convenient way to add another column
-     */
-    public function add(...$args) : ColumnDefinition
-    {
-        return $this->owner->add(...$args);
-    }
-
-    /**
-     * Set one or many properties
-     * @param $key string|array If array given, it should be key -> value
-     * @param $value: The singular value to set, if string $key given
+     * @param $column string|array name or pre-filled array
+     * @param $fieldname: ORM field this column is based on
      * @return ColumnDefinition
      */
-    public function set($key, $value = null) : ColumnDefinition
+    public function add($column, string $fieldname = null) : ColumnDefinition
     {
-        if (is_array($key)) {
-            if (!empty($value))
-                throw new \InvalidArgumentException("Provide either array or key/value pair!");
+        if (!is_array($column))
+            $column = [
+                'name' => $column,
+                'data' => $column, // a good guess (user can adjust it later)
+            ];
+        if ($fieldname)
+            $column['field'] = $fieldname;
 
-            $this->content = $key + $this->content;
-        } else {
-            $this->content[$key] = $value;
-        }
-        return $this;
-    }
+        $column = new ColumnDefinition($column, $this);
+        $this->store($column);
 
-    /* provide some convenience wrappers for set() */
-    public function __call($name, $arguments) : ColumnDefinition
-    {
-        if (in_array($name, $this->switchesPositive)) {
-            if (!empty($arguments))
-                throw new \InvalidArgumentException("$name() takes no arguments!");
-
-            $this->content[$name] = true;
-        }
-        if (in_array($name, $this->switchesNegative)) {
-            if (!empty($arguments))
-                throw new \InvalidArgumentException("$name() takes no arguments!");
-
-            $name = lcfirst(substr($name, 3));
-            $this->content[$name] = false;
-        }
-
-        return $this;
-    }
-
-    public function unset(string $key) : ColumnDefinition
-    {
-        unset($this->content[$key]);
-        return $this;
+        return $column;
     }
 
     /**
-     * @param $name: see CallbackFunction::__construct
-     * @param $args: see CallbackFunction::__construct
-     * @return ColumnDefinition
+     * Set titles of columns in given order
+     * Convenience method for setting all titles at once
+     * @param $titles array of titles in order of columns
      */
-    public function render(string $name, array $args = []) : ColumnDefinition
+    public function setTitles(array $titles)
     {
-        $this->content['render'] = new CallbackFunction($name, $args);
-        return $this;
+        if (count($titles) != count($this->columns)) {
+            $msg = 'Have ' . count($this->columns) . ' columns, but ' . count($titles) . ' titles given!';
+            throw new \InvalidArgumentException($msg);
+        }
+        foreach ($titles as $i => $t) {
+            if (!empty($t))
+                $this->columns[$i]['title'] = $t;
+        }
     }
 
+    /**
+     * Serialize to an array in json
+     * @return: column definitions
+     */
     public function jsonSerialize() : array
     {
-        return $this->content;
+        return array_values($this->columns);
     }
 
-    public function offsetExists($offset)
+    public function offsetExists($offset) : bool
     {
-        return isset($this->content[$offset]);
+        if (is_numeric($offset))
+            return isset($this->columns[$offset]);
+        return isset($this->index[$offset]);
     }
 
-    public function offsetGet($offset)
+    public function offsetGet(mixed $offset): mixed
     {
-        return $this->content[$offset];
+        if (is_numeric($offset))
+            return $this->columns[$offset];
+        return $this->columns[$this->index[$offset]];
     }
 
-    public function offsetSet($offset, $value)
+    public function offsetSet(mixed $offset, $value): void
     {
-        if (is_null($offset)) {
-            $this->content[] = $value;
-        } else {
-            $this->content[$offset] = $value;
-        }
+        throw new \BadMethodCallException('Direct setting is not supported! Use add().');
     }
 
-    public function offsetUnset($offset)
+    public function offsetUnset(mixed $offset): void
     {
-        unset($this->content[$offset]);
+        /* we do not allow splicing because DataTables uses a column's index
+           for the ordering command. So the order of columns needs to stay
+           consistent from the Controller down to the table displayed. */
+        throw new \BadMethodCallException('Unset is not supported!');
     }
 
+    public function getIterator(): Traversable
+    {
+        return new \ArrayIterator($this->columns);
+    }
+
+    public function count(): int
+    {
+        return count($this->columns);
+    }
+
+    protected function store(ColumnDefinition $column)
+    {
+        $this->columns[] = $column;
+        /* keep track of where we stored it.
+           Note: our array is only growing! No splicing! */
+        $this->index[$column['name']] = count($this->columns) - 1;
+    }
 }
