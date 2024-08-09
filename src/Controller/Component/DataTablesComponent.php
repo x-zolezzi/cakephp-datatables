@@ -9,6 +9,7 @@ use Cake\Database\Driver\Postgres;
 use Cake\Http\Exception\BadRequestException;
 use Cake\ORM\Locator\LocatorAwareTrait;
 use Cake\ORM\Query;
+use Cake\ORM\Query\SelectQuery;
 use Cake\ORM\Table;
 use DataTables\Lib\CallbackFunction;
 use DataTables\Lib\ColumnDefinitions;
@@ -226,7 +227,7 @@ class DataTablesComponent extends Component
      * @param $columns: Column definitions needed for filter/order operations
      * @return Query to be evaluated (Query::count() may have already been called)
      */
-    public function find(string $tableName, string $finder = 'all', array $options = [], array $columns = []): Query
+    public function find(string $tableName, string $finder = 'all', array $options = [], array $columns = []): SelectQuery
     {
         $delegateSearch = $options['delegateSearch'] ?? false;
         if (empty($columns))
@@ -256,7 +257,7 @@ class DataTablesComponent extends Component
             } else {
                 $data->where($this->getConfig('conditionsAnd'));
                 foreach ($this->getConfig('matching') as $association => $where) {
-                    $data->matching($association, function (Query $q) use ($where) {
+                    $data->matching($association, function (SelectQuery $q) use ($where) {
                         return $q->where($where);
                     });
                 }
@@ -320,7 +321,7 @@ class DataTablesComponent extends Component
                 }
             }
         }
-        settype($value, $columnType);
+        settype($value, $columnType ?? 'null');
         $condition = ["{$table->getAlias()}.{$column}{$textCast} {$comparison}" => $value];
 
         /* add as global condition */
