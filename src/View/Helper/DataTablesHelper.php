@@ -1,4 +1,5 @@
 <?php
+
 namespace DataTables\View\Helper;
 
 use Cake\View\Helper;
@@ -11,17 +12,18 @@ use DataTables\Lib\CallbackFunction;
  */
 class DataTablesHelper extends Helper
 {
-    public $helpers = ['Html'];
+    public array $helpers = ['Html'];
 
-    protected $_defaultConfig = [
+    protected array $_defaultConfig = [
         'searching' => true,
         'processing' => true,
         'serverSide' => true,
         'deferRender' => true,
     ];
 
-    public function initialize(array $config) : void
+    public function initialize(array $config): void
     {
+        $this->setConfig($config);
         /* set default i18n (not possible in _$defaultConfig due to use of __d() */
         if (empty($this->getConfig('language'))) {
             // defaults from datatables.net/reference/option/language
@@ -53,7 +55,7 @@ class DataTablesHelper extends Helper
      * @param array $args Optional array of arguments to be passed when calling
      * @return CallbackFunction
      */
-    public function callback(string $name, array $args = []) : CallbackFunction
+    public function callback(string $name, array $args = []): CallbackFunction
     {
         return new CallbackFunction($name, $args);
     }
@@ -65,32 +67,37 @@ class DataTablesHelper extends Helper
      * @param $htmlOptions: Options for the table, e.g. CSS classes
      * @return string containing a <table> and a <script> element
      */
-    public function table(string $id = 'datatable', array $dtOptions = [], array $htmlOptions = []) : string
+    public function table(string $id = 'datatable', array $dtOptions = [], array $htmlOptions = []): string
     {
         $htmlOptions = array_merge($htmlOptions,  [
             'id' => $id,
             'class' => 'dataTable ' . ($htmlOptions['class'] ?? ''),
         ]);
+        $dtOptions = array_merge($this->getConfig(), $dtOptions);
+
         $html = $this->Html->tag('table', '', $htmlOptions);
 
         $css = $this->Html->css(['DataTables.datatable/datatables.min.css'], ['block' => true]);
         $js = $this->Html->script(['DataTables.datatable/datatables.min.js'], ['block' => true]);
         $have_date_render = false;
+
         foreach ($dtOptions['columns'] as $column) {
-            if(isset($column['render']) && strpos($column['render'], '$.fn.dataTable.render.moment(') !== false) {
-                $have_date_render = true;
-                break;
+            if (isset($column['render'])) {
+                if (get_class($column['render']) == 'DataTables\Lib\CallbackFunction' && strpos($column['render']->code(), '$.fn.dataTable.render.moment(') !== false) {
+                    $have_date_render = true;
+                    break;
+                }
             }
         }
-        if($have_date_render) {
+        if ($have_date_render) {
             $js .= $this->Html->script(['DataTables.momentjs/moment.min.js', 'DataTables.datatable/datetime.js'], ['block' => true]);
         }
         $js .= $this->Html->script(['DataTables.cakephp.dataTables.js'], ['block' => true]);
-        
+
         $code = $this->draw("#{$id}", $dtOptions);
         $js .= $this->Html->scriptBlock($code, ['block' => true]);
 
-        return $html.$css.$js;
+        return $html . $css . $js;
     }
 
     /**
@@ -101,12 +108,12 @@ class DataTablesHelper extends Helper
      * @param array $options Optional additional/replacement configuration to this helper's config
      * @return string
      */
-    public function draw(string $selector, array $options = []) : string
+    public function draw(string $selector, array $options = []): string
     {
         // incorporate any defaults set earlier
         $options += $this->getConfig();
         // fill-in missing language options, in case some were customized
-        if(isset($options['language']['url'])) {
+        if (isset($options['language']['url'])) {
             $options['language'] = ['url' => $options['language']['url']];
         } else {
             $options['language'] += $this->getConfig('language');
@@ -122,8 +129,8 @@ class DataTablesHelper extends Helper
 
         // prepare javascript object from the config, including method calls
         $json = CallbackFunction::resolve(json_encode($options));
-        $json = str_replace('"#!!','',$json);
-        $json = str_replace('!!#"','',$json);
+        $json = str_replace('"#!!', '', $json);
+        $json = str_replace('!!#"', '', $json);
 
         // return a call to initializer method
         return "dt.initDataTables('{$selector}', {$json});\n";
@@ -155,7 +162,7 @@ class DataTablesHelper extends Helper
                 if ($o[0] === ($v['data'] ?? null) || $o[0] === ($v['field'] ?? null)) {
                     $order[$i][0] = $key;
                     break;
-    }
+                }
             }
         }
         return $order;

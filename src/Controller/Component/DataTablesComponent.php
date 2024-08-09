@@ -1,4 +1,5 @@
 <?php
+
 namespace DataTables\Controller\Component;
 
 use Cake\Collection\Collection;
@@ -9,6 +10,7 @@ use Cake\Http\Exception\BadRequestException;
 use Cake\ORM\Locator\LocatorAwareTrait;
 use Cake\ORM\Query;
 use Cake\ORM\Table;
+use DataTables\Lib\CallbackFunction;
 use DataTables\Lib\ColumnDefinitions;
 
 /**
@@ -18,7 +20,7 @@ class DataTablesComponent extends Component
 {
     use LocatorAwareTrait;
 
-    protected $_defaultConfig = [
+    protected array $_defaultConfig = [
         'start' => 0,
         'length' => 10,
         'order' => [],
@@ -29,7 +31,7 @@ class DataTablesComponent extends Component
         'comparison' => [], // per-column comparison definition
     ];
 
-    protected $_defaultComparison = [
+    protected array $_defaultComparison = [
         'string' => 'LIKE',
         'text' => 'LIKE',
         'uuid' => 'LIKE',
@@ -46,7 +48,7 @@ class DataTablesComponent extends Component
         'json' => 'LIKE',
     ];
 
-    protected $_viewVars = [
+    protected array $_viewVars = [
         'recordsTotal' => 0,
         'recordsFiltered' => 0,
         'draw' => 0
@@ -140,7 +142,7 @@ class DataTablesComponent extends Component
      * @param ColumnDefinitions|array $columns Column definitions
      * @return: true if additional filtering takes place
      */
-    private function _filter(array &$options, &$columns) : bool
+    private function _filter(array &$options, &$columns): bool
     {
         $queryParams = $this->getController()->getRequest()->getQueryParams();
 
@@ -162,7 +164,7 @@ class DataTablesComponent extends Component
                 throw new \InvalidArgumentException('Filtering requested, but no column definitions provided.');
 
             if ($delegateSearch) {
-            $options['globalSearch'] = $globalSearch;
+                $options['globalSearch'] = $globalSearch;
                 $haveFilters = true;
             } else {
                 foreach ($columns as $c) {
@@ -196,12 +198,23 @@ class DataTablesComponent extends Component
                     $options['localSearch'][$c['field']] = $localSearch;
                 } else {
                     $this->_addCondition($c['field'], $localSearch);
-            }
+                }
                 $haveFilters = true;
-        }
+            }
         }
 
         return $haveFilters;
+    }
+
+    /**
+     * Return a Javascript function wrapper to be used in DataTables configuration
+     * @param string $name Name of Javascript function to call
+     * @param array $args Optional array of arguments to be passed when calling
+     * @return CallbackFunction
+     */
+    public function callback(string $name, array $args = []): CallbackFunction
+    {
+        return new CallbackFunction($name, $args);
     }
 
     /**
@@ -213,7 +226,7 @@ class DataTablesComponent extends Component
      * @param $columns: Column definitions needed for filter/order operations
      * @return Query to be evaluated (Query::count() may have already been called)
      */
-    public function find(string $tableName, string $finder = 'all', array $options = [], array $columns = []) : Query
+    public function find(string $tableName, string $finder = 'all', array $options = [], array $columns = []): Query
     {
         $delegateSearch = $options['delegateSearch'] ?? false;
         if (empty($columns))
@@ -234,7 +247,7 @@ class DataTablesComponent extends Component
 
         // -- process filter options
         $haveFilters = $this->_filter($options, $columns);
-        
+
         // -- apply filters
         if ($haveFilters) {
             if ($delegateSearch) {
@@ -268,7 +281,6 @@ class DataTablesComponent extends Component
         // -- set all view vars to view and serialize array
         $this->_setViewVars();
         return $data;
-
     }
 
     private function _setViewVars()
@@ -292,16 +304,16 @@ class DataTablesComponent extends Component
         }
 
         $textCast = "";
-        
+
         /* build condition */
         $comparison = trim($this->_getComparison($table, $column));
-        
+
         $columnDesc = $table->getSchema()->getColumn($column);
         $columnType = $columnDesc['type'];
         // wrap value for LIKE and NOT LIKE
         if (strpos(strtolower($comparison), 'like') !== false) {
             $value = $this->getConfig('prefixSearch') ? "{$value}%" : "%{$value}%";
-            
+
             if ($this->_table->getConnection()->getDriver() instanceof Postgres) {
                 if ($columnType !== 'string' && $columnType !== 'text') {
                     $textCast = "::text";
@@ -332,7 +344,7 @@ class DataTablesComponent extends Component
      * @param $column: Database column name (may be in form Table.column)
      * @return: Database comparison operator
      */
-    protected function _getComparison(Table $table, string $column) : string
+    protected function _getComparison(Table $table, string $column): string
     {
         $config = new Collection($this->getConfig('comparison'));
 
